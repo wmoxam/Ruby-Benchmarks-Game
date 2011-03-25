@@ -1,0 +1,66 @@
+#!/usr/bin/env ruby
+
+require 'open3'
+
+def install
+  rvm_known_versions.each do |version|
+    `rvm install #{version}`
+  end
+end
+
+def run
+  rvm_versions.each do |version|
+    run_benchmarks(version)
+  end
+end
+
+def rvm_known_versions
+  `rvm list known`.reject {|version| version =~ /^#/ }.collect {|version| version.gsub(/\[|\]/, '') }
+end
+
+def rvm_versions
+  `rvm list`.split(/\n/).reject {|version| version =~ /^rvm rubies/ || version =~ /^\s*$/}.collect {|version| version.match(/\s*([^\s]*)/)[1].strip }
+end
+
+def run_benchmarks(version)
+  puts "Running Benchmarks for #{version}"
+  7.times do
+    benchmarks.each do |benchmark|
+      next unless benchmark_needs_run?(version, benchmark)
+      puts "time -p rvm #{version} ruby #{benchmark} #{benchmark_args(benchmark)}"
+      stdout_str, stderr_str, status = Open3.capture3("time -p rvm #{version} ruby #{benchmark} #{benchmark_args(benchmark)}")
+      puts stderr_str if status.exitstatus > 0
+      write_result(version, benchmark, stderr_str) if status.exitstatus == 0
+    end
+  end
+end
+
+def benchmark_args(benchmark)
+  basename = benchmark.gsub(/\.rb/, '')
+  if File.exists?("#{basename}.arg")
+    File.open("#{basename}.arg", 'r') {|f| f.read }.strip
+  elsif File.exists?("#{basename}.input")
+    "< #{basename}.input"
+  end
+end
+
+def benchmark_needs_run?(version, benchmark)
+  `grep #{version} results.csv | grep #{benchmark} | wc -l`.to_i < 7
+end
+
+def write_result(version, benchmark, stats)
+  time = stats.split(/\n/)[0].gsub(/real\s*/, '')
+  File.open('./results.csv', 'a') do |f|
+    f.puts "#{version},#{benchmark},#{time},#{Time.now.to_s}"
+  end
+end
+
+def benchmarks
+  `ls benchmarks/*.rb`.split(/\n/).collect {|benchmark| benchmark.strip }
+end
+
+if ARGV[0] == "install"
+  install
+else
+  run
+end
