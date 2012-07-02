@@ -1,10 +1,12 @@
-#!/usr/bin/env ruby
+#!/usr/bin/ruby
 
 require 'open3'
 
 def install
   rvm_known_versions.each do |version|
+    puts "Install #{version}"
     `rvm install #{version}`
+    puts "Finished installing #{version}"
   end
 end
 
@@ -15,7 +17,7 @@ def run
 end
 
 def rvm_known_versions
-  `rvm list known`.reject {|version| version =~ /^#/ }.collect {|version| version.gsub(/\[|\]/, '') }
+  `rvm list known`.split(/\n/).reject {|version| version =~ /^#/ }.collect {|version| version.gsub(/\[|\]/, '') }
 end
 
 def rvm_versions
